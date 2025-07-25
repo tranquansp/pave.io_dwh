@@ -1,0 +1,47 @@
+version: 2
+
+sources:
+  - name: raws 
+    schema: raws  
+    tables:
+      - name: inspections
+        description: "inspection raw data"
+        columns:
+          - name: vehicle_vin
+            description: "VIN Number of vehicle"
+            tests:
+              - not_null
+              - dbt_expectations.expect_column_values_to_match_regex:
+                  regex: '^[A-Z0-9]{17}$'
+                  config:
+                    severity: warn
+
+          - name: inspection_id
+            description: "Check duplication"
+            tests:
+              - not_null
+              - unique
+
+          - name: duration_minutes
+            description: "anomalous durations"
+            tests:
+              - not_null
+              - dbt_expectations.expect_column_values_to_be_between:
+                  min_value: 1
+                  max_value: 240
+                  config:
+                    severity: warn
+
+          - name: inspector_id
+            description: "inspector"
+            tests:
+              - not_null
+
+          - name: inspection_date
+            description: "ins date"
+            tests:
+              - not_null
+      - name: damage_reports
+      - name: geocode_city
+      - name: vehicles
+      - name: inspectors

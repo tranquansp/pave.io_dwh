@@ -1,0 +1,11 @@
+version: 2
+
+sources:
+  - name: marts 
+    schema: marts  
+    tables:
+      - name: fact_inspection
+      - name: fact_inspection_damage
+      - name: dim_vehicle
+      - name: dim_inspector
+      - name: dim_region

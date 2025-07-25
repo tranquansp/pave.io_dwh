@@ -1,0 +1,38 @@
+pv_dwh:
+  outputs:
+    raws:
+      dbname: postgres
+      host: {{ env_var('DB_HOST') }}
+      port: 20017
+      user: {{ env_var('DB_USER') }}
+      pass: {{ env_var('DB_PASS') }}
+      schema: raws
+      threads: 1
+      type: postgres
+    transitives:
+      dbname: postgres
+      host: {{ env_var('DB_HOST') }}
+      port: 20017
+      user: {{ env_var('DB_USER') }}
+      pass: {{ env_var('DB_PASS') }}
+      schema: transitives
+      threads: 1
+      type: postgres
+    marts:
+      dbname: postgres
+      host: {{ env_var('DB_HOST') }}
+      port: 20017
+      user: {{ env_var('DB_USER') }}
+      pass: {{ env_var('DB_PASS') }}
+      schema: marts
+      threads: 1
+      type: postgres
+    adhoc_analysis:
+      dbname: postgres
+      host: {{ env_var('DB_HOST') }}
+      port: 20017
+      user: {{ env_var('DB_USER') }}
+      pass: {{ env_var('DB_PASS') }}
+      schema: adhoc_analysis
+      threads: 1
+      type: postgres
