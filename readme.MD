@@ -12,40 +12,40 @@ We propose a lightweight yet robust architecture that is scalable, cost-effectiv
 
 ### 1.2 Data Ingestion
 
-- **Proactive Push (IoT/Mobile)**: Utilize **Amazon Kinesis Data Streams** to capture real-time events pushed from mobile apps or IoT devices. Stream data using **Amazon Kinesis Data Analytics (Flink)** from source to sink (Amazon S3).
+- Proactive Push (IoT/Mobile): Utilize Amazon Kinesis Data Streams to capture real-time events pushed from mobile apps or IoT devices. Stream data using Amazon Kinesis Data Analytics (Flink) from source to sink (Amazon S3).
 
-- **Scheduled Pull (REST APIs)**: Use **AWS Lambda** triggered by **Amazon EventBridge** to periodically extract data from external APIs.
+- Scheduled Pull (REST APIs): Use AWS Lambda triggered by Amazon EventBridge to periodically extract data from external APIs.
 
-- **Callback APIs**: Handle inbound REST API callbacks via **Amazon API Gateway** integrated with **Lambda**. Forward the payload to **Kinesis** and process in real-time using **Flink**, persisting output to **Amazon S3**.
+- Callback APIs: Handle inbound REST API callbacks via Amazon API Gateway integrated with Lambda. Forward the payload to Kinesis and process in real-time using Flink, persisting output to Amazon S3.
 
 ### 1.3 Data Lake Design
 
-We implement a centralized data lake using **Amazon S3**, which acts as the landing and staging layer. This decouples raw data ingestion from downstream structured processing and enables future use cases like ML model training.
+We implement a centralized data lake using Amazon S3, which acts as the landing and staging layer. This decouples raw data ingestion from downstream structured processing and enables future use cases like ML model training.
 
 #### 1.3.1 Metadata Management
-To handle structured and semi-structured files on S3 (without native DDL), we use **AWS Glue Data Catalog** for schema discovery, classification, and querying with **Amazon Athena**, **AWS Glue**, or **Redshift Spectrum**.
+To handle structured and semi-structured files on S3 (without native DDL), we use AWS Glue Data Catalog for schema discovery, classification, and querying with Amazon Athena, AWS Glue, or Redshift Spectrum.
 
 #### 1.3.2 Ad-hoc Querying
-Use **Amazon Athena** for querying data directly from S3. Athena can also serve as a data source for BI tools like **Amazon QuickSight** or **Power BI**.
+Use Amazon Athena for querying data directly from S3. Athena can also serve as a data source for BI tools like Amazon QuickSight or Power BI.
 
 #### 1.3.3 Ad-hoc Data Transformations
-Use **AWS Glue ETL Jobs** to perform Spark-based transformations, writing the output back to S3.
+Use AWS Glue ETL Jobs to perform Spark-based transformations, writing the output back to S3.
 
 #### 1.3.4 Lakehouse Architecture
-Implement a lakehouse using **Apache Iceberg** on S3 with **AWS Glue** and **Athena**, enabling ACID transactions and versioned tables.
+Implement a lakehouse using Apache Iceberg on S3 with AWS Glue and Athena, enabling ACID transactions and versioned tables.
 
 #### 1.3.5 Data Analytics
-Use **Amazon SageMaker** for ML workloads, connecting directly to S3 or querying via the Glue Data Catalog.
+Use Amazon SageMaker for ML workloads, connecting directly to S3 or querying via the Glue Data Catalog.
 
 ### 1.4 Data Warehouse
 
-While the data lake supports flexibility and raw data storage, we also implement a structured **data warehouse on Amazon Redshift** for governed, performant analytics and BI consumption.
+While the data lake supports flexibility and raw data storage, we also implement a structured data warehouse on Amazon Redshift for governed, performant analytics and BI consumption.
 
 #### 1.4.1 Loading Data into Redshift
-Use **S3 Event Notifications + Amazon SQS + Lambda** to trigger copy jobs. Simplify ingestion by predefining generic staging tables with `VARCHAR` columns and loading raw data directly. This enables a unified, code-reusable ingestion process without per-table customization.
+Use S3 Event Notifications + Amazon SQS + Lambda to trigger copy jobs. Simplify ingestion by predefining generic staging tables with `VARCHAR` columns and loading raw data directly. This enables a unified, code-reusable ingestion process without per-table customization.
 
 #### 1.4.2 Physical Warehouse Layer
-**Amazon Redshift** is AWS’s native data warehousing solution. (Note: **ClickHouse Cloud** on AWS Marketplace is a potential alternative for high-performance analytics at potentially lower cost.)
+Amazon Redshift is AWS’s native data warehousing solution. (Note: ClickHouse Cloud on AWS Marketplace is a potential alternative for high-performance analytics at potentially lower cost.)
 
 #### 1.4.3 Data Modeling and Pipeline Design
 Implement a 3-tier model in Redshift:
@@ -54,32 +54,32 @@ Implement a 3-tier model in Redshift:
 - `staging`: Enriched and cleaned data  
 - `marts`: Star-schema modeled tables for analytics  
 
-Follow **Kimball Dimensional Modeling** standards, with fact and dimension tables tailored for self-service BI.
+Follow Kimball Dimensional Modeling standards, with fact and dimension tables tailored for self-service BI.
 
 #### 1.4.4 Data Transformation (ELT)
-Modern ELT favors in-warehouse SQL-based transformation over external ETL processes. We propose using **dbt (Data Build Tool)** to orchestrate and manage transformations in Redshift.
+Modern ELT favors in-warehouse SQL-based transformation over external ETL processes. We propose using dbt (Data Build Tool) to orchestrate and manage transformations in Redshift.
 
 - dbt enables SQL-based pipelines.
 - Business Analysts (BAs) and Data Analysts (DAs) can participate directly in transformation logic.
 - CI/CD ready: transformation logic can be versioned and deployed using GitOps.
-- Deploy dbt on **AWS Fargate** using:  
+- Deploy dbt on AWS Fargate using:  
   `dbt seed && dbt run && dbt artifacts`
 
 #### 1.4.5 Data Validation
-- Use **dbt tests** for schema validation, regex checks, null detection, uniqueness, and freshness checks.
+- Use dbt tests for schema validation, regex checks, null detection, uniqueness, and freshness checks.
 - Validation results are persisted in Redshift and can be visualized or monitored.
 
 ### 1.5 BI & Visualization
 
-- Use **Amazon QuickSight** for serverless BI. However, due to limitations (e.g., lack of virtual joins, complex measures, advanced charting), consider **Power BI**, **Tableau**, or **Apache Superset** for more advanced use cases.
+- Use Amazon QuickSight for serverless BI. However, due to limitations (e.g., lack of virtual joins, complex measures, advanced charting), consider Power BI, Tableau, or Apache Superset for more advanced use cases.
 - When using QuickSight, pre-join fact and dimension tables via Redshift views to compensate for modeling limitations.
-- Demo dashboards are built using **Power BI**, which offers advanced features such as DAX, Copilot AI assistant, and dynamic visualizations.
+- Demo dashboards are built using Power BI, which offers advanced features such as DAX, Copilot AI assistant, and dynamic visualizations.
 
 ### 1.6 Pipeline Orchestration
-Use **AWS Step Functions** to orchestrate ETL/ELT processes and manage task dependencies.
+Use AWS Step Functions to orchestrate ETL/ELT processes and manage task dependencies.
 
 ### 1.7 Data Catalog & Governance
-Maintain a unified metadata layer using **dbt docs**, **dbt tests**, and profiling. For advanced governance, consider deploying **OpenMetadata** on **EC2**, **Fargate**, or **EKS** to manage:
+Maintain a unified metadata layer using dbt docs, dbt tests, and profiling. For advanced governance, consider deploying OpenMetadata on EC2, Fargate, or EKS to manage:
 
 - Business Glossary  
 - Tagging & Data Lineage  
@@ -87,23 +87,23 @@ Maintain a unified metadata layer using **dbt docs**, **dbt tests**, and profili
 - Schema Evolution Tracking  
 
 ### 1.8 Real-time Monitoring
-Use **Amazon Managed Grafana** to query Redshift/Athena and display real-time data freshness and data quality dashboards.
+Use Amazon Managed Grafana to query Redshift/Athena and display real-time data freshness and data quality dashboards.
 
 ### 1.9 Notification Services
-Use **Amazon SNS** to send alerts or pipeline failure notifications.
+Use Amazon SNS to send alerts or pipeline failure notifications.
 
 ### 1.10 Logging & Observability
-Use **Amazon CloudWatch** to log Lambda functions, API Gateway calls, and ETL/ELT job statuses.
+Use Amazon CloudWatch to log Lambda functions, API Gateway calls, and ETL/ELT job statuses.
 
 ### 1.11 CI/CD & Deployment
-Use **GitLab CI/CD** in combination with **Terraform** or **Teraflow** to automate infrastructure and dbt deployments.
+Use GitLab CI/CD in combination with Terraform or Teraflow to automate infrastructure and dbt deployments.
 
 ### 1.12 Security
 Implement AWS security best practices:
 
-- Use **IAM roles** for least privilege access  
-- Store secrets in **AWS Secrets Manager** or **Key Management Service (KMS)**  
-- Apply **data masking** or tokenization for sensitive fields
+- Use IAM roles for least privilege access  
+- Store secrets in AWS Secrets Manager or Key Management Service (KMS)  
+- Apply data masking or tokenization for sensitive fields
 
 ---
 
@@ -120,7 +120,7 @@ The architecture is visualized below based on the components discussed:
 ## 2.1 Data Quality Checks
 
 ### Validate VIN Format
-**SQL Rule:**
+SQL Rule:
 
 ```sql
 SELECT *
@@ -130,7 +130,7 @@ WHERE vehicle_vin IS NULL
    OR vehicle_vin ~ '[^A-Z0-9]';
 ```
 
-**dbt Test:**
+dbt Test:
 
 ```yaml
 - name: fact_inspection
@@ -140,20 +140,28 @@ WHERE vehicle_vin IS NULL
         regex: '^[A-Z0-9]{17}$'
 ```
 
+- See sql code at: [pv_dwh/models/validations/vld_vinformat.sql](pv_dwh/models/validations/vld_vinformat.sql)
+- See dbt test at: [pv_dwh/models/schema.yml](pv_dwh/models/schema.yml)
+
 ### Check Missing Fields
-See: `vld_missing_fields.sql`
+
+- See sql code at: [pv_dwh/models/validations/vld_missing_fields.sql](pv_dwh/models/validations/vld_missing_fields.sql)
+- See dbt test at: [pv_dwh/models/schema.yml](pv_dwh/models/schema.yml)
 
 ### Identify Duplicates
-See: `vld_duplication.sql`
+
+- See sql code at: [pv_dwh/models/validations/vld_duplication.sql](pv_dwh/models/validations/vld_duplication.sql)
+- See dbt test at: [pv_dwh/models/schema.yml](pv_dwh/models/schema.yml)
 
 ### Flag Anomalous Durations
-See: `vld_anomalous_durations.sql`
+- See sql code at: [pv_dwh/models/validations/vld_anomalous_durations.sql](pv_dwh/models/validations/vld_anomalous_durations.sql)
+- See dbt test at: [pv_dwh/models/schema.yml](pv_dwh/models/schema.yml)
 
 ---
 
 ## 2.2 Dimensional Modeling (Star Schema)
 
-Create fact and dimension tables based on business requirements, starting with an **Enterprise Bus Matrix (EBM)** to align dimensions and facts.
+Create fact and dimension tables based on business requirements, starting with an Enterprise Bus Matrix (EBM) to align dimensions and facts.
 
 ![Dimensional Reports](images/dimensional_reports.jpg "Star Schema Design")
 
@@ -374,7 +382,7 @@ When a well-designed dimensional data model is in place, these metrics can often
 Check code at: [pv_dwh/models/adhoc_analysis/avg_damage_costs.sql](pv_dwh/models/adhoc_analysis/avg_damage_costs.sql)
 
 #### + Inspector Performance Scores
-Check code at: [pv_dwh/models/adhoc_analysis/avg_damage_costs.sql](pv_dwh/models/adhoc_analysis/avg_damage_costs.sql)
+Check code at: [pv_dwh/models/adhoc_analysis/inspector_efficiency.sql](pv_dwh/models/adhoc_analysis/inspector_efficiency.sql)
 
 #### + Geographic Damage Patterns
 Check code at: [pv_dwh/models/adhoc_analysis/geographic_heatmap.sql](pv_dwh/models/adhoc_analysis/geographic_heatmap.sql)
@@ -390,10 +398,18 @@ Check code at: [pv_dwh/models/adhoc_analysis/monthly_trendings.sql](pv_dwh/model
 
 Write optimized SQL queries for the following metrics. While these could be generated via BI tools, we include SQL code here as requested:
 
-- Top 10 most common damage types by vehicle make  
+- Top 10 most common damage types by vehicle make
+Check code at: [pv_dwh/models/adhoc_analysis/top_10_damages.sql](pv_dwh/models/adhoc_analysis/top_10_damages.sql)
+
 - Inspector efficiency metrics (e.g., inspections per day, accuracy rates)  
+Check code at: [pv_dwh/models/adhoc_analysis/inspector_efficiency.sql](pv_dwh/models/adhoc_analysis/inspector_efficiency.sql)
+
 - Monthly trends in inspection volumes and damage costs  
+Check code at: [pv_dwh/models/adhoc_analysis/monthly_trendings.sql](pv_dwh/models/adhoc_analysis/monthly_trendings.sql)
+
 - Geographic heatmap of damage severity
+Check code at: [pv_dwh/models/adhoc_analysis/geographic_heatmap.sql](pv_dwh/models/adhoc_analysis/geographic_heatmap.sql)
+
 
 ## 2. QuickSight Dashboard Mock-up
 
