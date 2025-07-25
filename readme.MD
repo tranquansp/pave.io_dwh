@@ -1,99 +1,128 @@
 
-# Part 1: Data Pipeline Design
-Design a scalable ETL pipeline architecture on AWS. Create:
-- Data ingestion from mobile apps/APIs
-- Transformation layers
-- Storage solutions (S3, Redshift)
-- BI/visualization layer
-- Real-time vs batch processing paths
+# Part 1: Data Platform Architecture on AWS
 
-## 1. Solution justification
-### 1.1 Overview:
-Design the lightweigth but feature-enough system that is scalable and integrated-ready to use ML in the future. Costly & ease of maintanence.
+Design a scalable, maintainable, and future-ready data platform on AWS for Pave.io, supporting both batch and real-time processing, with integration-ready paths for advanced analytics and machine learning.
 
-### 1.2 data ingestion: 
-- Proactive pushing agent (iot, mobile): Aws kinesis is the interface that earn the realtime request, then aws flink will stream source->sink to the s3.
-- Pulling data (rest api): Lambda Functions & eventbridge will crawl (pull) data by schedule.
-- Callback rest api: AWS Api gateway + lambda will handle callback api -> then send to kinesis -> flink will stream source->sink to the s3.
+---
 
-### 1.3 Design Datalake
-We can use AWS S3 as a datalake, notice that we don't ingest directly to warehouse, cause we can use this datalake for ML later and we can see it like a staging erea before processing before moving to the structured data warehouse as well.
+## 1. Solution Justification
 
-#### 1.3.1 manage data lake metadata: 
-cause the data on s3 is untructure data or structure data files without DDL. So that, we need to have data catalog to defined data for quering later (query from athena / redshift / glue ...)
+### 1.1 Overview
+We propose a lightweight yet robust architecture that is scalable, cost-effective, and easy to maintain. The design enables seamless integration with future machine learning initiatives and supports both structured and semi-structured data workflows.
 
-#### 1.3.2 adhoc query
-we can use aws athena for make adhoc query, or use athena as a datasource in BI Tool (Quicksight / PowerBI)
+### 1.2 Data Ingestion
 
-#### 1.3.3 adhoc data transformation: 
-aws glue make a transformation by using spark code (from s3 files to s3 files)
+- **Proactive Push (IoT/Mobile)**: Utilize **Amazon Kinesis Data Streams** to capture real-time events pushed from mobile apps or IoT devices. Stream data using **Amazon Kinesis Data Analytics (Flink)** from source to sink (Amazon S3).
 
-####  1.3.4 build lakehouse on s3: 
-aws glue & aws athena already support iceberg, then we can build lakehouse via create iceberg table via glue / athena.
+- **Scheduled Pull (REST APIs)**: Use **AWS Lambda** triggered by **Amazon EventBridge** to periodically extract data from external APIs.
 
-#### 1.3.5 data analytics: 
-aws sagemaker can connect to s3 directly, or via glue catalog to query / process / analyze data.
+- **Callback APIs**: Handle inbound REST API callbacks via **Amazon API Gateway** integrated with **Lambda**. Forward the payload to **Kinesis** and process in real-time using **Flink**, persisting output to **Amazon S3**.
 
-### 1.4 The main data warehouse
-Beside building datalake for many geneal purposes, we also need to build a stureture datawarehouse to make it clear and easy to provice a friendly data-driven system to end users, help them understand the data and do self-service reports without DA, DE. 
+### 1.3 Data Lake Design
 
-#### 1.4.1 Load data to warehouse (source-sink lake to dwh): 
-S3 event + SQS + lambda to load to redshift, we don't make this process complicated, just create table in redshift with the same path of s3 and the same header metadata with all string data type, then copy all data to redshift => so that, we just make the same common code for all tables, no need to sync data case by case.
+We implement a centralized data lake using **Amazon S3**, which acts as the landing and staging layer. This decouples raw data ingestion from downstream structured processing and enables future use cases like ML model training.
 
-#### 1.4.2 Data warehouse (physical layer): 
-Redshift is the native solution for data warehouse on aws (notice: we can also consider Clickhouse Cloud on aws marketplace as well: costly & faster than Redshift for most of the task)
+#### 1.3.1 Metadata Management
+To handle structured and semi-structured files on S3 (without native DDL), we use **AWS Glue Data Catalog** for schema discovery, classification, and querying with **Amazon Athena**, **AWS Glue**, or **Redshift Spectrum**.
 
-#### 1.4.3 Design data pipeline & data model:
-- Design data model on Redshift with the standard transformation: (raw schema (copy origin data from s3) -> trantitive schema (enriched) -> mart schema). 
-- Using the design of star schema of KimBall as a dimensional modelling with some fact tables and some dim tables , we need to create the transformation process to transform data from schema raw to mart, then use mart schema for visulization.
+#### 1.3.2 Ad-hoc Querying
+Use **Amazon Athena** for querying data directly from S3. Athena can also serve as a data source for BI tools like **Amazon QuickSight** or **Power BI**.
 
-#### 1.4.4 data transformation:
-- The trending of data transformation now is to give this process to data warehouse to transform data via sql statement. Data warehouse will arrange and optimize the best effort to transform data the most effectively cause all data and all process will run on the physical datawarehouse area, rather than the old method: load data from source schema -> process on memory -> write it to dest schema: expensive. 
-- So that, we can send sql to data warehouse to run query via dbt tools. This tool is easy to learn and cause it use sql for transformation so that DA can help DE to transform data easily. DA is closer to business than DE, so that this solution can help to build new data pipeline fastly. Also, DA can be proactive to make new transformation when they write sql code and commit to brand, no need for setting new data process, dbt run can do all logical jobs in 1 time.
-- Sum up, we use dbt & deploy on Fargate to launch transformation via run this command: dbt seed && dbt run && dbt artifacts
+#### 1.3.3 Ad-hoc Data Transformations
+Use **AWS Glue ETL Jobs** to perform Spark-based transformations, writing the output back to S3.
 
-#### 1.4.5 data validation:
-- dbt supports many validation solution: check by regex, check duplicate, constraint ... and write result to data warehouse directly
-- dbt supports check data freness, data profile and write result to data warehouse directly
+#### 1.3.4 Lakehouse Architecture
+Implement a lakehouse using **Apache Iceberg** on S3 with **AWS Glue** and **Athena**, enabling ACID transactions and versioned tables.
 
-### 1.5 Visualization
-- We need to have a BI tool for visualization purpose. Aws has Quicksight, but one of the weakness is lack of advance BI features, especially data modelling, virtual table, complex measure, dynamic programming and lack of complex charts, comparing to other market leader such as powerbi, tableau, holistic or even apache superset.
-- Data modelling: Quicksight doesnt support data modelling so that we can levarage the power of dimensional data models. If we use Quicksight, all we need is to make a view on redshift to pre join all dimension to fact and query on one table.
-- In the demo, I give you an option of PowerBI for you to consider. Powerbi is the market leader of BI Tools, that provide a lot of features to build all type of charts, support dynamic reports via DAX programming, enabling AI support via Copilot.
+#### 1.3.5 Data Analytics
+Use **Amazon SageMaker** for ML workloads, connecting directly to S3 or querying via the Glue Data Catalog.
 
-### 1.6 Pipeline orchestration: 
-we can use Steps Function to arrange and manage data pipeline.
+### 1.4 Data Warehouse
 
-### 1.7 Data catalog: 
-We also need to have data catalog for Data Pipeline explaination, dbt docs, Business Glossary, Tagging, Data profiling ... In general, we can do that by run dbt test / dbt generate docs / dbt run profilling and see the reports on Redshift directly. However, to make it easy on UI, and no need to run dbt, web can also consider build a data catalog system like openmetadata and run it on EC2 or Fargate or EKS.
+While the data lake supports flexibility and raw data storage, we also implement a structured **data warehouse on Amazon Redshift** for governed, performant analytics and BI consumption.
 
-### 1.8 Realtime data monitoring: 
-We can use grafana to query data and show realtime on AWS Managed Grafana.
+#### 1.4.1 Loading Data into Redshift
+Use **S3 Event Notifications + Amazon SQS + Lambda** to trigger copy jobs. Simplify ingestion by predefining generic staging tables with `VARCHAR` columns and loading raw data directly. This enables a unified, code-reusable ingestion process without per-table customization.
 
-### 1.9 Notification services: 
-Use AWS SNS
+#### 1.4.2 Physical Warehouse Layer
+**Amazon Redshift** is AWS’s native data warehousing solution. (Note: **ClickHouse Cloud** on AWS Marketplace is a potential alternative for high-performance analytics at potentially lower cost.)
 
-### 1.10 Logging: 
-AWS Cloudwatch
+#### 1.4.3 Data Modeling and Pipeline Design
+Implement a 3-tier model in Redshift:
 
-### 1.10 CI & Deployment: 
-consider gitlab-ci + teraflow
+- `raw`: Raw data copied from S3  
+- `staging`: Enriched and cleaned data  
+- `marts`: Star-schema modeled tables for analytics  
 
-###  1.11 Security with IAM, Keyvault, masking data ...
+Follow **Kimball Dimensional Modeling** standards, with fact and dimension tables tailored for self-service BI.
 
-## 2. Architect diagram
-Based on the solution justification above, we make a diagram of data platform architecture 
+#### 1.4.4 Data Transformation (ELT)
+Modern ELT favors in-warehouse SQL-based transformation over external ETL processes. We propose using **dbt (Data Build Tool)** to orchestrate and manage transformations in Redshift.
 
-![Image](images/Pave_io.drawio.png "PBI")
+- dbt enables SQL-based pipelines.
+- Business Analysts (BAs) and Data Analysts (DAs) can participate directly in transformation logic.
+- CI/CD ready: transformation logic can be versioned and deployed using GitOps.
+- Deploy dbt on **AWS Fargate** using:  
+  `dbt seed && dbt run && dbt artifacts`
 
-# Part 2 - Transformation Pipeline
+#### 1.4.5 Data Validation
+- Use **dbt tests** for schema validation, regex checks, null detection, uniqueness, and freshness checks.
+- Validation results are persisted in Redshift and can be visualized or monitored.
 
-## 2.1. Data Quality Checks
-- Validate VIN formats
+### 1.5 BI & Visualization
 
-Validate by selecting the fail cases. Check code at: [pv_dwh/models/validations/vld_vinformat.sql](pv_dwh/models/validations/vld_vinformat.sql)
+- Use **Amazon QuickSight** for serverless BI. However, due to limitations (e.g., lack of virtual joins, complex measures, advanced charting), consider **Power BI**, **Tableau**, or **Apache Superset** for more advanced use cases.
+- When using QuickSight, pre-join fact and dimension tables via Redshift views to compensate for modeling limitations.
+- Demo dashboards are built using **Power BI**, which offers advanced features such as DAX, Copilot AI assistant, and dynamic visualizations.
 
-```
+### 1.6 Pipeline Orchestration
+Use **AWS Step Functions** to orchestrate ETL/ELT processes and manage task dependencies.
+
+### 1.7 Data Catalog & Governance
+Maintain a unified metadata layer using **dbt docs**, **dbt tests**, and profiling. For advanced governance, consider deploying **OpenMetadata** on **EC2**, **Fargate**, or **EKS** to manage:
+
+- Business Glossary  
+- Tagging & Data Lineage  
+- Data Profiling  
+- Schema Evolution Tracking  
+
+### 1.8 Real-time Monitoring
+Use **Amazon Managed Grafana** to query Redshift/Athena and display real-time data freshness and data quality dashboards.
+
+### 1.9 Notification Services
+Use **Amazon SNS** to send alerts or pipeline failure notifications.
+
+### 1.10 Logging & Observability
+Use **Amazon CloudWatch** to log Lambda functions, API Gateway calls, and ETL/ELT job statuses.
+
+### 1.11 CI/CD & Deployment
+Use **GitLab CI/CD** in combination with **Terraform** or **Teraflow** to automate infrastructure and dbt deployments.
+
+### 1.12 Security
+Implement AWS security best practices:
+
+- Use **IAM roles** for least privilege access  
+- Store secrets in **AWS Secrets Manager** or **Key Management Service (KMS)**  
+- Apply **data masking** or tokenization for sensitive fields
+
+---
+
+## 2. Architecture Diagram
+
+The architecture is visualized below based on the components discussed:
+
+![Image](images/Pave_io.drawio.png "Pave.io - Data Platform")
+
+---
+
+# Part 2: Data Transformation & Modeling
+
+## 2.1 Data Quality Checks
+
+### Validate VIN Format
+**SQL Rule:**
+
+```sql
 SELECT *
 FROM {{ ref('fact_inspection') }}
 WHERE vehicle_vin IS NULL
@@ -101,9 +130,9 @@ WHERE vehicle_vin IS NULL
    OR vehicle_vin ~ '[^A-Z0-9]';
 ```
 
-Validate via dbt test. Check code at: [pv_dwh/models/schema.yml](pv_dwh/models/schema.yml)
+**dbt Test:**
 
-```
+```yaml
 - name: fact_inspection
   tests:
     - dbt_expectations.expect_column_values_to_match_regex:
@@ -111,61 +140,47 @@ Validate via dbt test. Check code at: [pv_dwh/models/schema.yml](pv_dwh/models/s
         regex: '^[A-Z0-9]{17}$'
 ```
 
-- Check for missing critical fields
+### Check Missing Fields
+See: `vld_missing_fields.sql`
 
-Validate by selecting the fail cases
+### Identify Duplicates
+See: `vld_duplication.sql`
 
-Check code at: [pv_dwh/models/validations/vld_missing_fields.sql](pv_dwh/models/validations/vld_missing_fields.sql)
+### Flag Anomalous Durations
+See: `vld_anomalous_durations.sql`
 
-- Identify duplicate inspections
+---
 
-Validate by selecting the fail cases
+## 2.2 Dimensional Modeling (Star Schema)
 
-Check code at: [pv_dwh/models/validations/vld_duplication.sql](pv_dwh/models/validations/vld_duplication.sql)
+Create fact and dimension tables based on business requirements, starting with an **Enterprise Bus Matrix (EBM)** to align dimensions and facts.
 
-- Flag anomalous inspection durations
+![Dimensional Reports](images/dimensional_reports.jpg "Star Schema Design")
 
-Validate by selecting the fail cases
-
-Check code at: [pv_dwh/models/validations/vld_anomalous_durations.sql](pv_dwh/models/validations/vld_anomalous_durations.sql)
-
-## 2. Create fact and dimension tables following star schema
-Depend on the requests of data usage, we need to design an enterprise bus matrix (EBM) to explore them via related dimensions & facts. From this EBM, we can indicates the suitable dimension & fact.
-
-![Image](images/dimensional_reports.jpg "PBI")
-
-### Fact Inspections
+### Fact Tables
+#### Fact Inspection
 - Dim Date
-- Dim Vehicles 
+- Dim Vehicles
 - Dim Inspector
 - Dim Region
-- Duration
+- Inspection Duration
 
 Check code at: [pv_dwh/models/marts/fact/fact_inspection.sql](pv_dwh/models/marts/fact/fact_inspection.sql)
 
-### Fact Inspections Damage
+#### Fact Inspection Damage
 - Dim Date
-- Dim Vehicles 
+- Dim Vehicles
 - Dim Inspector
 - Dim Region
-- Cost 
+- Damage Cost
 
 Check code at: [pv_dwh/models/marts/fact/fact_inspection_damage.sql](pv_dwh/models/marts/fact/fact_inspection_damage.sql)
 
-
-## All dimension tables:
-
-###  Dim Date
-Check code at: [pv_dwh/models/marts/dim/dim_date.sql](pv_dwh/models/marts/dim/dim_date.sql)
-
-###  Dim Vehicles 
-Check code at: [pv_dwh/models/marts/dim/dim_vehicle.sql](pv_dwh/models/marts/dim/dim_vehicle.sql)
-
-###  Dim Inspector => see 2.2 to know more how to design SCD type 2.
-Check code at: [pv_dwh/models/marts/dim/dim_inspector.sql](pv_dwh/models/marts/dim/dim_inspector.sql)
-
-###  Dim Region
-Check code at: [pv_dwh/models/marts/dim/dim_region.sql](pv_dwh/models/marts/dim/dim_region.sql)
+### Dimension Tables
+- **Dim Date** – [pv_dwh/models/marts/dim/dim_date.sql](pv_dwh/models/marts/dim/dim_date.sql)
+- **Dim Vehicles** – [pv_dwh/models/marts/dim/dim_vehicle.sql](pv_dwh/models/marts/dim/dim_vehicle.sql)
+- **Dim Inspector (SCD Type 2)** – [pv_dwh/models/marts/dim/dim_inspector.sql](pv_dwh/models/marts/dim/dim_inspector.sql)
+- **Dim Region** – [pv_dwh/models/marts/dim/dim_region.sql](pv_dwh/models/marts/dim/dim_region.sql)
 
 - In case dim region, we need to build region (state / city) by reverse from coordination value from inspection data, and create new table in dim_location with location, city, state
 
@@ -233,18 +248,25 @@ dbt run --profile pv_dwh --target marts --profiles-dir profiles --select models/
 ```
 
 
-### 2.2 Implement slowly changing dimensions for inspector data
-Follow the design of SCD type 2 of Kimball (Chapter 5 Datawarehouse toolkit), we have 2 cases:
+## 2.2 Implement Slowly Changing Dimensions (SCD) for Inspector Data
 
-I. If new comming data is not changes compared to existing data in Dim inspector: do nothing
+Following the **Type 2 Slowly Changing Dimensions** methodology as described in *The Data Warehouse Toolkit* by Kimball (Chapter 5), we consider two scenarios:
 
-II. If data changes:
-- Add new row to table dim_inspectors that records the new data, including valid time for new line
-- Create supporate key sk_inspector_id (inspector_id, valid_from) instead of inspector_id
-- Insert sk_inspector_id in Fact Inspections and Fact Inspection Damage
-- There are 2 type of new changes: new record & changed existing record
+### Case I: No Change Detected  
+If the incoming data matches the existing record in the `dim_inspector` table, no action is required.
 
-For new record, we have the code:
+### Case II: Change Detected  
+If there are differences between the new data and the existing record:
+
+- Insert a new row into `dim_inspector` capturing the updated attributes, along with `valid_from` and `valid_to` fields to track the effective period.
+- Use a surrogate key `sk_inspector_id` (typically a composite of `inspector_id` and `valid_from`) instead of relying solely on `inspector_id`.
+- Reference this surrogate key (`sk_inspector_id`) in both `fact_inspection` and `fact_inspection_damage` tables to ensure proper historical tracking.
+
+There are two types of new entries:
+1. **New Inspector Record** (not previously present in the dimension table)  
+2. **Modified Existing Record** (attributes have changed compared to the latest version)
+
+For new records, the logic is as follows:
 
 ```
 WITH snapshot AS (
@@ -268,7 +290,7 @@ SELECT
     WHERE c.inspector_id IS null;
 ```
 
-For changed existing record:
+For Modified Existing Record:
 
 ```
 SELECT
@@ -289,44 +311,9 @@ WHERE r.name IS DISTINCT FROM d.name OR
       r.experience_level IS DISTINCT FROM d.experience_level OR
       CAST(r.certification_date AS DATE) IS DISTINCT FROM d.certification_date OR
       r.inspections_completed IS DISTINCT FROM d.inspections_completed
-
-Then, merge to existing Dim Inspectors:
-select 
-    inspector_id,
-    name,
-    region,
-    experience_level,
-    certification_date,
-    inspections_completed,
-    valid_from,
-    valid_to,
-    last_data_changed_time
-FROM marts.dim_inspector_scd
-UNION ALL
-SELECT 
-    inspector_id,
-    name,
-    region,
-    experience_level,
-    certification_date,
-    inspections_completed,
-    valid_from,
-    valid_to,
-    last_data_changed_time
-FROM transitive.inspector_new_snapshot
-UNION ALL
-SELECT
-    inspector_id,
-    name,
-    region,
-    experience_level,
-    certification_date,
-    inspections_completed,
-    valid_from,
-    valid_to,
-    last_data_changed_time
-FROM transitive.inspector_update
 ```
+
+Then, merge to existing Dim Inspectors (see code at: [pv_dwh/models/transitives/inspector_full.sql](pv_dwh/models/transitives/inspector_full.sql))
 
 Next, we create sk_inspector_id and adjust the valid_from & valid_to that indicates the changed time of a record
 
@@ -379,65 +366,86 @@ LEFT JOIN marts.dim_inspector d
  AND CAST(i.inspection_date AS timestamp) <  d.valid_to;
 ```
 
-### - Calculate derived metrics:
-Actually, when we design a enough good data modelling, these sql can be generated naturally via BI Tool (by dropping & dragging dimension & metric). However, to resolve this request, we also provide the sql by following:
+### - Calculating Derived Metrics
 
-#### + Average damage cost by vehicle type
+When a well-designed dimensional data model is in place, these metrics can often be derived naturally within BI tools through drag-and-drop interactions with dimensions and measures. However, for clarity and to fulfill requirements, we also provide the SQL implementations:
+
+#### + Average Damage Cost by Vehicle Type
 Check code at: [pv_dwh/models/adhoc_analysis/avg_damage_costs.sql](pv_dwh/models/adhoc_analysis/avg_damage_costs.sql)
 
-#### + Inspector performance scores
+#### + Inspector Performance Scores
 Check code at: [pv_dwh/models/adhoc_analysis/avg_damage_costs.sql](pv_dwh/models/adhoc_analysis/avg_damage_costs.sql)
 
-#### + Geographic damage patterns
+#### + Geographic Damage Patterns
 Check code at: [pv_dwh/models/adhoc_analysis/geographic_heatmap.sql](pv_dwh/models/adhoc_analysis/geographic_heatmap.sql)
 
-#### + Time-based inspection trends
+#### + Time-based Inspection Trends
 Check code at: [pv_dwh/models/adhoc_analysis/monthly_trendings.sql](pv_dwh/models/adhoc_analysis/monthly_trendings.sql)
 
+---
+
 # Part 3: Analytics & Visualization (35 points)
-## 1. SQL Analytics Queries Write optimized queries for:
-Again, we don't need to make this query cause we can make the report via using BI Tools. But, following the requirement, we still make sql for this query:
-- Top 10 most common damage types by vehicle make
-- Inspector efficiency metrics (inspections/day, accuracy rates)
-- Monthly trending of inspection volumes and damage costs
-- Geographic heatmap data for damage severity
+
+## 1. SQL Analytics Queries
+
+Write optimized SQL queries for the following metrics. While these could be generated via BI tools, we include SQL code here as requested:
+
+- Top 10 most common damage types by vehicle make  
+- Inspector efficiency metrics (e.g., inspections per day, accuracy rates)  
+- Monthly trends in inspection volumes and damage costs  
+- Geographic heatmap of damage severity
 
 ## 2. QuickSight Dashboard Mock-up
-I already mentioned in part 1, Quicksight is not good to build visualization with native star schema. So I use powerbi to build relationship and some visualization you want
 
-Create a dashboard design (use any tool/framework), Include at least 5 visualizations:
-- KPI cards for key metrics: use KPI chart as below
-- Time series of inspection volumes: use line chart as below
-- Geographic distribution map: use Map chart as below
-- Inspector performance leaderboard: use table chart as below
-- Damage cost breakdown by category: use pie chart as below
+As noted in Part 1, Amazon QuickSight has limitations with star schema modeling. Therefore, Power BI is used here to demonstrate advanced relationships and visualizations.
 
-### 2.1 Option 1: Use Quicksight with pre join data models (flatten fact)
-We need to make a view of prejoin fact. See code on [pv_dwh/models/marts/fact/fact_inspection_damage_flat_v.sql](pv_dwh/models/marts/fact/fact_inspection_damage_flat_v.sql) 
+### Dashboard Requirements (5+ Visuals):
+- KPI Cards for key metrics  
+- Line Chart for time series of inspection volumes  
+- Map Chart for geographic damage distribution  
+- Table Chart for inspector performance leaderboard  
+- Pie Chart for damage cost breakdown by category  
 
-Then use use only one table fact_inspection_damage_flat_v to make visualization as below
+### 2.1 Option 1: QuickSight with Pre-joined Data Models (Flattened Fact)
 
-![Image](images/quicksight-edit.jpg "Edit Quicksight")
+Create a flattened view by joining fact and dimension tables. See code:  
+[pv_dwh/models/marts/fact/fact_inspection_damage_flat_v.sql](pv_dwh/models/marts/fact/fact_inspection_damage_flat_v.sql)
 
+This pre-joined view (`fact_inspection_damage_flat_v`) is then used in QuickSight.
+
+![Image](images/quicksight-edit.jpg "Edit Quicksight")  
 ![Image](images/quicksight-reports.jpg "View Quicksight")
 
-### 2.2 Option 1: Use PowerBI, that supports data modelling for star schema
-- Create relationship on Powerbi from existing data marts
-![Image](images/pbi1.jpg "PBI")
+### 2.2 Option 2: Power BI with Star Schema Modeling
+
+Power BI supports native star schema modeling and allows defining relationships directly.
+
+- Define relationships between fact and dimension tables  
+![Image](images/pbi1.jpg "PBI")  
 ![Image](images/pbi2.jpg "PBI")
 
-- Then we build the slicer & related charts
-![Image](images/pbi3.jpg "PBI")
+- Build slicers and charts  
+![Image](images/pbi3.jpg "PBI")  
 ![Image](images/pbi4.jpg "PBI")
 
-- For heatmap map by state: we need to build a virtual table to support render fillmap (heatmap map) as below
-![Image](images/pbi6.jpg "PBI")
+- For heatmap by state, create a virtual table to support fill map rendering  
+![Image](images/pbi6.jpg "PBI")  
 ![Image](images/pbi5.jpg "PBI")
 
-You can find PowerBI file at [visualization/inspections_data.pbix](visualization/inspections_data.pbix)
+Power BI dashboard file is available at:  
+[visualization/inspections_data.pbix](visualization/inspections_data.pbix)
+
+---
 
 ## 3. Real-time Monitoring Queries
-### Design queries for operational dashboards: We can use Grafana and write sql to get live records from Redshift as below:
-- Live inspection count (last hour) => see sql in source code [pv_dwh/models/adhoc_analysis/live_inspection_count.sql](pv_dwh/models/adhoc_analysis/live_inspection_count.sql)
-- Queue depth by region [pv_dwh/models/adhoc_analysis/queue_depth_by_region.sql](pv_dwh/models/adhoc_analysis/queue_depth_by_region.sql)
-- Failed inspection alerts [pv_dwh/models/adhoc_analysis/failled_alerts.sql](pv_dwh/models/adhoc_analysis/failled_alerts.sql)
+
+Design SQL queries for operational dashboards using Grafana connected to Amazon Redshift:
+
+- **Live Inspection Count (Last Hour):**  
+  [pv_dwh/models/adhoc_analysis/live_inspection_count.sql](pv_dwh/models/adhoc_analysis/live_inspection_count.sql)
+
+- **Queue Depth by Region:**  
+  [pv_dwh/models/adhoc_analysis/queue_depth_by_region.sql](pv_dwh/models/adhoc_analysis/queue_depth_by_region.sql)
+
+- **Failed Inspection Alerts:**  
+  [pv_dwh/models/adhoc_analysis/failled_alerts.sql](pv_dwh/models/adhoc_analysis/failled_alerts.sql)
